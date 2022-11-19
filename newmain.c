@@ -58,6 +58,8 @@ uint8_t FLAG;
 void setup(void);
 void canales(void);
 void MTMR0(void);
+void escribir(uint8_t data, uint8_t address);
+uint8_t leer(uint8_t address);
 
 //******************************************************************************
 //INTERRUPCIONES
@@ -86,6 +88,7 @@ void __interrupt() isr(void)
         PIR1bits.ADIF = 0; //apagamos la bandera del ADC
     }
 
+
     //interrupcion del TIMER0
     if(INTCONbits.T0IF == 1) //si la bandera del Timer esta encendida (hizo overflow)
     {
@@ -113,7 +116,57 @@ void __interrupt() isr(void)
         TMR0 = _tmr0_value; //se inicia el TMR0
         INTCONbits.T0IF = 0; //se limpia la bandera del timer
     }
+    //interrupcion del PORTB
+    if(INTCONbits.RBIF == 1) //habiilitacion del change on interrupt flag
+    {
+        if(PORTBbits.RB2 == 0) //si presionamos el push de b2 (modo UART)
+        {
+            FLAG = 1; //activamos la bandera del UART
+            while(FLAG == 1)
+            {
+                TXSTAbits.TXEN = 1; //transmicion habilitada
+                UART(); //rutina para imprimir caracteres y funciones
+            }
+            TXSTAbits.TXEN = 0; //transmicion deshabilitada
+        }
+        if(PORTBbits.RB0 == 0) //si presionamos el push b0 (modo EEPROM READ)
+        {
+            PORTDbits.RD0 = 1; //led indicador de modo
+            PORTDbits.RD1 = 0; //led indicador de modo
+            escribir(VALOR1, 0x10); //guardar en memoria EEPROM primer valor
+            escribir(VALOR2, 0x12); //guardar en memoria EEMPROM segundo valor
+            escribir(POT3, 0x12); //guardar en memoria EEPROM tercer valor
+            escribir(POT4, 0x13); //guardaarr en memoria EEPROM cuarto valor
+            __delay_ms(500);
+        }
+        if(PORTBbits.RB1 == 0) //si presionamos el push b1 (modo EEPROM WRITE )
+        {
+            ADCON0bits.ADON = 0; //deshablitamos el ADC
+            PORTDbits.RD0 = 0; //led indicador de modo
+            PORTDbits.RD1 = 1; //led indicador de modo
+            val1 = leer(0x10); //extraemos valor val1 de la eeprom
+            val2 = leer(0x11); //extraemos valor val2 de la eeprom
+            val3 = leer(0x12); //extraemos valor val3 de la eeprom
+            val4 = leer(0x13); //extraemos valor val4 de la eeprom
 
+            CCPR1L = val1; //valor del ccp1 asignado a val1
+            CCPR2L = val2; //valor del ccp2 asignado a val2
+            POT3 = val3; //valor del pot3 asignado a val3
+            POT4 = val4; //valor del pot4 asignado a val4
+            __delay_ms(3000);
+            ////////////////////////////////////////////////////////////////////
+            //////////////////////ARREGLAR/////////////////////////////////////
+            //if(PORTBbits.RB3 == 0)
+            //{
+                ADCON0bits.ADON = 1; //hablitamos enable del adc
+            //}
+            ////////////////////////////////////////////////////////////////////
+            ////////////////////////////////////////////////////////////////////
+        }
+        INTCONbits.RBIF = 0; //limpiar la bandera del PORTB (must be cleared in software)
+    }
+    PIR1bits.TMR2IF = 0; // se limpia la bandera del TMR2 (no match de TMR2 - PR2
+}
 //************************************************************************
 //CONFIGURACION
 //*************************************************************************
@@ -235,4 +288,93 @@ void canales()
                 break;
         }
     }
+}
+
+//funcion para escribir en la EEPROM
+void escribir(uint8_t data, uint8_t address)
+{
+    EEADR = address;
+    EEDAT = data; //valor a escribir
+
+    EECON1bits.EEPGD = 0; //apuntar a la data memory
+    EECON1bits.WREN = 1; //habilitar escritura
+    INTCONbits.GIE = 0; //se apagan las interrupciones globales
+
+    EECON2 = 0x55;
+    EECON2 = 0xAA;
+    EECON1bits.WR = 1; //iniciamos la escritura
+
+    while(PIR2bits.EEIF == 0); //esperar al final de la escritura
+    PIR2bits.EEIF = 0; //apagamos la bandera
+    EECON1bits.WREN = 0; //nos aseguramos que no este escribiendo
+    INTCONbits.GIE = 0; //habilitar las interrupciones globales
+}
+
+//funcion para leer en la EEPROM
+uint8_t leer(uint8_t address)
+{
+    EEADR = address;
+    EECON1bits.EEPGD = 0; //apuntar a la program memory
+    EECON1bits.RD = 1; //indicar que se leera
+    uint8_t data = EEDATA;
+    return data;
+}
+//funcion para escribir en la EEPROM
+void escribir(uint8_t data, uint8_t address)
+{
+    EEADR = address;
+    EEDAT = data; //valor a escribir
+
+    EECON1bits.EEPGD = 0; //apuntar a la data memory
+    EECON1bits.WREN = 1; //habilitar escritura
+    INTCONbits.GIE = 0; //se apagan las interrupciones globales
+
+    EECON2 = 0x55;
+    EECON2 = 0xAA;
+    EECON1bits.WR = 1; //iniciamos la escritura
+
+    while(PIR2bits.EEIF == 0); //esperar al final de la escritura
+    PIR2bits.EEIF = 0; //apagamos la bandera
+    EECON1bits.WREN = 0; //nos aseguramos que no este escribiendo
+    INTCONbits.GIE = 0; //habilitar las interrupciones globales
+}
+
+//funcion para leer en la EEPROM
+uint8_t leer(uint8_t address)
+{
+    EEADR = address;
+    EECON1bits.EEPGD = 0; //apuntar a la program memory
+    EECON1bits.RD = 1; //indicar que se leera
+    uint8_t data = EEDATA;
+    return data;
+}
+
+//funcion para escribir en la EEPROM
+void escribir(uint8_t data, uint8_t address)
+{
+    EEADR = address;
+    EEDAT = data; //valor a escribir
+
+    EECON1bits.EEPGD = 0; //apuntar a la data memory
+    EECON1bits.WREN = 1; //habilitar escritura
+    INTCONbits.GIE = 0; //se apagan las interrupciones globales
+
+    EECON2 = 0x55;
+    EECON2 = 0xAA;
+    EECON1bits.WR = 1; //iniciamos la escritura
+
+    while(PIR2bits.EEIF == 0); //esperar al final de la escritura
+    PIR2bits.EEIF = 0; //apagamos la bandera
+    EECON1bits.WREN = 0; //nos aseguramos que no este escribiendo
+    INTCONbits.GIE = 0; //habilitar las interrupciones globales
+}
+
+//funcion para leer en la EEPROM
+uint8_t leer(uint8_t address)
+{
+    EEADR = address;
+    EECON1bits.EEPGD = 0; //apuntar a la program memory
+    EECON1bits.RD = 1; //indicar que se leera
+    uint8_t data = EEDATA;
+    return data;
 }
