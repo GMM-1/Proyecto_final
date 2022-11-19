@@ -9,7 +9,7 @@ hardware: PIC 16F887, 3 potenciómetros, servomotores, 3 leds
 creado: 12/11/2022
 última modificación: 12/11/2022
 ********************************************************************************
- */
+*/
 
 #define _XTAL_FREQ 8000000 //frecuencia de 8 MHz
 #include <xc.h>
