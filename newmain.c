@@ -51,6 +51,7 @@ uint8_t VALOR = 0;
 uint8_t VALOR1;
 uint8_t VALOR2;
 uint8_t FLAG;
+uint8_t OP;
 unsigned char I[72] = " \n Bienvenido, presione 1 para continuar con la comunicacion serial \n ";
 unsigned char R[60] = " \n Que servomotor desea mover? \n 1) PD \n 2) FI \n 3) CD \n 4) CI \n ";
 unsigned char M[36] = " \n Ingrese un numero entre 0 y 9 \n ";
@@ -60,13 +61,13 @@ unsigned char M[36] = " \n Ingrese un numero entre 0 y 9 \n ";
 //******************************************************************************
 void setup(void);
 void canales(void);
-void MTMR0(void);
 void escribir(uint8_t data, uint8_t address);
 uint8_t leer(uint8_t address);
 void UART(void);
 void INS(void);
 void OTRO(void);
 void MENSAJE(void);
+void MTMR0(void);
 
 //******************************************************************************
 //INTERRUPCIONES
@@ -95,7 +96,6 @@ void __interrupt() isr(void)
         PIR1bits.ADIF = 0; //apagamos la bandera del ADC
     }
 
-
     //interrupcion del TIMER0
     if(INTCONbits.T0IF == 1) //si la bandera del Timer esta encendida (hizo overflow)
     {
@@ -123,6 +123,7 @@ void __interrupt() isr(void)
         TMR0 = _tmr0_value; //se inicia el TMR0
         INTCONbits.T0IF = 0; //se limpia la bandera del timer
     }
+
     //interrupcion del PORTB
     if(INTCONbits.RBIF == 1) //habiilitacion del change on interrupt flag
     {
@@ -174,6 +175,7 @@ void __interrupt() isr(void)
     }
     PIR1bits.TMR2IF = 0; // se limpia la bandera del TMR2 (no match de TMR2 - PR2
 }
+
 //************************************************************************
 //CONFIGURACION
 //*************************************************************************
@@ -272,6 +274,22 @@ void main (void)
 //FUNCIONES
 //********************************************************
 
+//imprimir el mensaje en la terminal
+void UART(void)
+{
+    __delay_ms(500);
+    VALOR = 0;
+    do
+    {
+        VALOR++;
+        TXREG = I[VALOR];
+        __delay_ms(50);
+    }
+    while(VALOR<=72); //numero de caracteres
+    while(RCIF == 0); //mientras no este full el buffer
+    INS();
+}
+
 void canales()
 {
     if(ADCON0bits.GO == 0) // si la conversion esta terminada
@@ -342,81 +360,6 @@ uint8_t leer(uint8_t address)
     EECON1bits.RD = 1; //indicar que se leera
     uint8_t data = EEDATA;
     return data;
-}
-//funcion para escribir en la EEPROM
-void escribir(uint8_t data, uint8_t address)
-{
-    EEADR = address;
-    EEDAT = data; //valor a escribir
-
-    EECON1bits.EEPGD = 0; //apuntar a la data memory
-    EECON1bits.WREN = 1; //habilitar escritura
-    INTCONbits.GIE = 0; //se apagan las interrupciones globales
-
-    EECON2 = 0x55;
-    EECON2 = 0xAA;
-    EECON1bits.WR = 1; //iniciamos la escritura
-
-    while(PIR2bits.EEIF == 0); //esperar al final de la escritura
-    PIR2bits.EEIF = 0; //apagamos la bandera
-    EECON1bits.WREN = 0; //nos aseguramos que no este escribiendo
-    INTCONbits.GIE = 0; //habilitar las interrupciones globales
-}
-
-//funcion para leer en la EEPROM
-uint8_t leer(uint8_t address)
-{
-    EEADR = address;
-    EECON1bits.EEPGD = 0; //apuntar a la program memory
-    EECON1bits.RD = 1; //indicar que se leera
-    uint8_t data = EEDATA;
-    return data;
-}
-
-//funcion para escribir en la EEPROM
-void escribir(uint8_t data, uint8_t address)
-{
-    EEADR = address;
-    EEDAT = data; //valor a escribir
-
-    EECON1bits.EEPGD = 0; //apuntar a la data memory
-    EECON1bits.WREN = 1; //habilitar escritura
-    INTCONbits.GIE = 0; //se apagan las interrupciones globales
-
-    EECON2 = 0x55;
-    EECON2 = 0xAA;
-    EECON1bits.WR = 1; //iniciamos la escritura
-
-    while(PIR2bits.EEIF == 0); //esperar al final de la escritura
-    PIR2bits.EEIF = 0; //apagamos la bandera
-    EECON1bits.WREN = 0; //nos aseguramos que no este escribiendo
-    INTCONbits.GIE = 0; //habilitar las interrupciones globales
-}
-
-//funcion para leer en la EEPROM
-uint8_t leer(uint8_t address)
-{
-    EEADR = address;
-    EECON1bits.EEPGD = 0; //apuntar a la program memory
-    EECON1bits.RD = 1; //indicar que se leera
-    uint8_t data = EEDATA;
-    return data;
-}
-
-//imprimir el mensaje en la terminal
-void UART(void)
-{
-    __delay_ms(500);
-    VALOR = 0;
-    do
-    {
-        VALOR++;
-        TXREG = I[VALOR];
-        __delay_ms(50);
-    }
-    while(VALOR<=72); //numero de caracteres
-    while(RCIF == 0); //mientras no este full el buffer
-    INS();
 }
 
 //mensaje a desplegar
@@ -501,5 +444,5 @@ void MENSAJE(void)
     while(RCIF == 0)
     {
         OP = 0; //limpiamos la bandera
-    }   
+    }
 }
