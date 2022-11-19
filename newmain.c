@@ -51,6 +51,9 @@ uint8_t VALOR = 0;
 uint8_t VALOR1;
 uint8_t VALOR2;
 uint8_t FLAG;
+unsigned char I[72] = " \n Bienvenido, presione 1 para continuar con la comunicacion serial \n ";
+unsigned char R[60] = " \n Que servomotor desea mover? \n 1) PD \n 2) FI \n 3) CD \n 4) CI \n ";
+unsigned char M[36] = " \n Ingrese un numero entre 0 y 9 \n ";
 
 //*********************************************************************
 //PROTOTIPOS DE FUNCIONES
@@ -60,6 +63,10 @@ void canales(void);
 void MTMR0(void);
 void escribir(uint8_t data, uint8_t address);
 uint8_t leer(uint8_t address);
+void UART(void);
+void INS(void);
+void OTRO(void);
+void MENSAJE(void);
 
 //******************************************************************************
 //INTERRUPCIONES
@@ -231,6 +238,23 @@ void setup(void)
     CCP1CON = 0B00001100; //modo PWM para el ccp1
     CCP2CON = 0B00001111; //modo PWM para el ccp2
 
+    //configuracion del UART
+    PIR1bits.RCIF = 0; //flag del reciever apagada
+    PIE1bits.RCIE = 0; //interrupcion del reciever activada
+    PIE1bits.TXIE = 0; //interrupcion del transmiter activada
+    TXSTAbits.TX9 = 0; //transmicion de 8 bits
+    TXSTAbits.TXEN = 1;//transmicion habilitada
+    TXSTAbits.SYNC = 0; //modo asincrono
+    TXSTAbits.BRGH = 1; //high speed
+    RCSTAbits.RX9 = 0; // recepcion de 8 bits
+    RCSTAbits.CREN = 1; //receptor habilitado
+    RCSTAbits.SPEN = 1; // entrada y salida
+
+    //generador de baudios del UART
+    BAUDCTLbits.BRG16 = 0; //activar el generador de baudios de 8 bits
+    SPBRG = 25; //9600
+    SPBRGH = 1;
+}
 
 //****************************************************************************
 //codigo principal
@@ -377,4 +401,105 @@ uint8_t leer(uint8_t address)
     EECON1bits.RD = 1; //indicar que se leera
     uint8_t data = EEDATA;
     return data;
+}
+
+//imprimir el mensaje en la terminal
+void UART(void)
+{
+    __delay_ms(500);
+    VALOR = 0;
+    do
+    {
+        VALOR++;
+        TXREG = I[VALOR];
+        __delay_ms(50);
+    }
+    while(VALOR<=72); //numero de caracteres
+    while(RCIF == 0); //mientras no este full el buffer
+    INS();
+}
+
+//mensaje a desplegar
+void INS(void)
+{
+    OP = RCREG;
+    // " \nBienvenido, presione 1 para
+    switch(OP)
+    {
+        case 49: //si se presiona el 1 opcion manualmente
+            __delay_ms(300);
+            VALOR = 0;
+            do
+            {
+              VALOR++;
+              TXREG = R[VALOR];
+              __delay_ms(50);
+            }
+            while(VALOR<=60); //cantidad de caracteres del array
+                while(RCIF == 0);
+            OP = 0; //limpiar la variable que hace el cambio
+            OTRO();
+            break;
+        case 50: // si se presiona el 2 opcion de comunicacion serial
+            TXSTAbits.TXEN = 0; //apagar la bandera
+        OP = 0;
+        break;
+    }
+}
+
+void OTRO(void)
+{
+    OP = RCREG;
+    switch(OP)
+    {
+        case 49:
+            MENSAJE();
+            if(RCREG >= 48 && RCREG <= 57)
+            {
+                VAL = RCREG;
+                canales();
+            }
+            break;
+        case 50:
+            MENSAJE();
+            if(RCREG >= 48 && RCREG <= 57)
+            {
+                VAL1 = RCREG;
+                canales();
+            }
+            break;
+        case 51:
+            MENSAJE();
+            if(RCREG >= 48 && RCREG <= 57)
+            {
+                VAL2 = RCREG;
+                canales();
+            }
+            break;
+        case 52:
+            MENSAJE();
+            if(RCREG >= 48 && RCREG <= 57)
+            {
+                VAL3 = RCREG;
+                canales();
+            }
+            break;
+    }
+}
+
+void MENSAJE(void)
+{
+    __delay_ms(500);
+    VALOR = 0;
+    do
+    {
+        VALOR++;
+        TXREG = M[VALOR];
+        __delay_ms(50);
+    }
+    while(VALOR<=36); //cantidad de caracteres
+    while(RCIF == 0)
+    {
+        OP = 0; //limpiamos la bandera
+    }   
 }
